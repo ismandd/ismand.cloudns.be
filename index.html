@@ -2,6 +2,20 @@
 <html>
 <head>
   <title>ismand</title>
+  <meta charset="UTF-8">
+  <script>
+    function updateTime() {
+      const now = new Date();
+      const timeString = now.toLocaleTimeString();
+      document.querySelector("p").textContent = timeString;
+    }
+
+    window.onload = () => {
+      document.querySelector("h1").textContent = "Current Time:";
+      updateTime(); // show immediately
+      setInterval(updateTime, 1000); // update every second
+    };
+  </script>
 </head>
 <body>
   <h1></h1>
