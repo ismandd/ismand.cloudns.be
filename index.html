@@ -1,47 +1,143 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Public Chat</title>
-  <meta charset="UTF-8">
-  <style>
-    body { font-family: sans-serif; }
-    #chat { border: 1px solid #ccc; height: 300px; overflow-y: scroll; padding: 10px; }
-    #msg { width: 80%; }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Simple Firebase Chat</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    max-width: 600px;
+    margin: 20px auto;
+    display: flex;
+    flex-direction: column;
+    height: 90vh;
+  }
+  #chat {
+    flex: 1;
+    border: 1px solid #ccc;
+    padding: 10px;
+    overflow-y: auto;
+    margin-bottom: 10px;
+    background: #f9f9f9;
+  }
+  #chat div {
+    margin-bottom: 8px;
+  }
+  #chat .username {
+    font-weight: bold;
+    margin-right: 5px;
+    color: #2b7a78;
+  }
+  #chat .message {
+    display: inline-block;
+    word-wrap: break-word;
+    max-width: 80%;
+  }
+  #inputArea {
+    display: flex;
+  }
+  #messageInput {
+    flex: 1;
+    padding: 8px;
+    font-size: 16px;
+  }
+  #sendBtn {
+    padding: 8px 16px;
+    font-size: 16px;
+    margin-left: 5px;
+  }
+  #usernameDisplay {
+    margin-bottom: 10px;
+    font-style: italic;
+    color: #555;
+  }
+</style>
 </head>
 <body>
-  <h1>Public Chat</h1>
-  <div id="chat"></div>
-  <input type="text" id="msg" placeholder="Type a message">
-  <button onclick="send()">Send</button>
 
-  <script>
-    const name = localStorage.getItem("username") || (() => {
-      const n = "Guest" + Math.floor(Math.random() * 10000);
-      localStorage.setItem("username", n);
-      return n;
-    })();
+<h2>Simple Firebase Chat</h2>
+<div id="usernameDisplay"></div>
+<div id="chat"></div>
+<div id="inputArea">
+  <input id="messageInput" type="text" placeholder="Type your message..." autocomplete="off" />
+  <button id="sendBtn">Send</button>
+</div>
 
-    async function send() {
-      const text = document.getElementById("msg").value;
-      if (text.trim() === "") return;
-      await fetch("/.netlify/functions/send", {
-        method: "POST",
-        body: JSON.stringify({ name, text }),
-      });
-      document.getElementById("msg").value = "";
-    }
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+  import { getDatabase, ref, push, onChildAdded, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-database.js";
 
-    async function load() {
-      const res = await fetch("/.netlify/functions/messages");
-      const messages = await res.json();
-      const chat = document.getElementById("chat");
-      chat.innerHTML = messages.map(m => `<p><b>${m.name}:</b> ${m.text}</p>`).join("");
-      chat.scrollTop = chat.scrollHeight;
-    }
+  // Your Firebase config:
+  const firebaseConfig = {
+    apiKey: "AIzaSyCdOdsdiClQ-Ef4uADX2gglOl04CulpYrE",
+    authDomain: "ismand-cloudns-be.firebaseapp.com",
+    databaseURL: "https://ismand-cloudns-be-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "ismand-cloudns-be",
+    storageBucket: "ismand-cloudns-be.firebasestorage.app",
+    messagingSenderId: "225354161393",
+    appId: "1:225354161393:web:d51871c9e27b2d6ace1d50"
+  };
 
-    setInterval(load, 1000); // update every second
-    load();
-  </script>
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  const messagesRef = ref(db, "messages");
+
+  // Generate a random username (e.g. User1234)
+  const username = "User" + Math.floor(Math.random() * 9000 + 1000);
+  document.getElementById("usernameDisplay").textContent = `You are: ${username}`;
+
+  // DOM elements
+  const chatEl = document.getElementById("chat");
+  const inputEl = document.getElementById("messageInput");
+  const sendBtn = document.getElementById("sendBtn");
+
+  // Function to add message to chat window
+  function addMessage(data) {
+    const { username: user, text } = data;
+    const msgDiv = document.createElement("div");
+
+    const userSpan = document.createElement("span");
+    userSpan.classList.add("username");
+    userSpan.textContent = user + ":";
+
+    const textSpan = document.createElement("span");
+    textSpan.classList.add("message");
+    textSpan.textContent = " " + text;
+
+    msgDiv.appendChild(userSpan);
+    msgDiv.appendChild(textSpan);
+    chatEl.appendChild(msgDiv);
+
+    // Scroll to bottom
+    chatEl.scrollTop = chatEl.scrollHeight;
+  }
+
+  // Listen for new messages
+  onChildAdded(messagesRef, (snapshot) => {
+    const msgData = snapshot.val();
+    addMessage(msgData);
+  });
+
+  // Send a message
+  function sendMessage() {
+    const text = inputEl.value.trim();
+    if (text === "") return;
+    push(messagesRef, {
+      username,
+      text,
+      timestamp: serverTimestamp()
+    });
+    inputEl.value = "";
+    inputEl.focus();
+  }
+
+  sendBtn.addEventListener("click", sendMessage);
+  inputEl.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") sendMessage();
+  });
+</script>
+
 </body>
 </html>
