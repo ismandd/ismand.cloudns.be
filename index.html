@@ -3,8 +3,73 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Phone Verified Firebase Chat</title>
-<link rel="stylesheet" href="style.css" />
+<title>Phone Verified Firebase Chat with Country Code Selector</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    max-width: 480px;
+    margin: 30px auto;
+    padding: 0 10px;
+  }
+  h2 {
+    text-align: center;
+  }
+  #authSection, #chatSection {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  label {
+    font-weight: bold;
+    margin-bottom: 3px;
+  }
+  select, input[type="tel"], input[type="text"] {
+    font-size: 16px;
+    padding: 8px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  #phoneInputGroup {
+    display: flex;
+    gap: 5px;
+  }
+  #phoneInputGroup select {
+    flex: 0 0 120px;
+  }
+  #phoneInputGroup input {
+    flex: 1 1 auto;
+  }
+  button {
+    font-size: 16px;
+    padding: 10px;
+    cursor: pointer;
+  }
+  button:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+  }
+  #chat {
+    border: 1px solid #ccc;
+    padding: 10px;
+    height: 300px;
+    overflow-y: auto;
+    background: #f9f9f9;
+  }
+  .username {
+    font-weight: bold;
+    color: #333;
+  }
+  .message {
+    margin-left: 5px;
+  }
+  #inputArea {
+    display: flex;
+    gap: 5px;
+  }
+  #inputArea input {
+    flex: 1 1 auto;
+  }
+</style>
 </head>
 <body>
 
@@ -12,13 +77,28 @@
 
 <div id="authSection">
   <div id="phoneInputSection">
-    <input type="tel" id="phoneNumber" placeholder="+1234567890" />
-    <div id="recaptcha-container"></div>
-    <button id="sendCodeBtn">Send Code</button>
+    <label for="countryCode">Select country code:</label>
+    <div id="phoneInputGroup">
+      <select id="countryCode" aria-label="Country Code">
+        <!-- Basic example list, you can add more -->
+        <option value="+1">🇺🇸 +1 (USA)</option>
+        <option value="+44">🇬🇧 +44 (UK)</option>
+        <option value="+91">🇮🇳 +91 (India)</option>
+        <option value="+61">🇦🇺 +61 (Australia)</option>
+        <option value="+81">🇯🇵 +81 (Japan)</option>
+        <option value="+49">🇩🇪 +49 (Germany)</option>
+        <option value="+33">🇫🇷 +33 (France)</option>
+        <option value="+7">🇷🇺 +7 (Russia)</option>
+      </select>
+      <input type="tel" id="phoneNumber" placeholder="Enter phone number" aria-label="Phone Number" />
+      <button id="sendCodeBtn">Send Code</button>
+    </div>
+    <button id="retryBtn" disabled>Retry (30s)</button>
   </div>
 
   <div id="codeInputSection" style="display:none;">
-    <input type="text" id="verificationCode" placeholder="Enter verification code" />
+    <label for="verificationCode">Enter 6-digit verification code:</label>
+    <input type="text" id="verificationCode" maxlength="6" pattern="\d{6}" placeholder="123456" aria-label="Verification Code" />
     <button id="verifyCodeBtn">Verify Code</button>
   </div>
 </div>
@@ -56,8 +136,10 @@
   const authSection = document.getElementById("authSection");
   const phoneInputSection = document.getElementById("phoneInputSection");
   const codeInputSection = document.getElementById("codeInputSection");
+  const countryCodeSelect = document.getElementById("countryCode");
   const phoneNumberInput = document.getElementById("phoneNumber");
   const sendCodeBtn = document.getElementById("sendCodeBtn");
+  const retryBtn = document.getElementById("retryBtn");
   const verificationCodeInput = document.getElementById("verificationCode");
   const verifyCodeBtn = document.getElementById("verifyCodeBtn");
   const chatSection = document.getElementById("chatSection");
@@ -71,47 +153,92 @@
   let messagesRef = null;
   const displayedMessages = new Set();
 
+  // Retry control variables
+  let retryCount = 0;
+  const maxRetries = 5;
+  let retryCooldown = 30; // seconds
+  let retryTimer = null;
+
   // Setup invisible reCAPTCHA
-  window.recaptchaVerifier = new RecaptchaVerifier('recaptcha-container', {
+  window.recaptchaVerifier = new RecaptchaVerifier('phoneInputSection', {
     'size': 'invisible',
     'callback': (response) => {
-      // reCAPTCHA solved, allow sendCodeBtn click to proceed
       sendCodeBtn.disabled = false;
     }
   }, auth);
 
+  function startRetryCooldown() {
+    retryBtn.disabled = true;
+    let timeLeft = retryCooldown;
+    retryBtn.textContent = `Retry (${timeLeft}s)`;
+
+    retryTimer = setInterval(() => {
+      timeLeft--;
+      retryBtn.textContent = `Retry (${timeLeft}s)`;
+      if (timeLeft <= 0) {
+        clearInterval(retryTimer);
+        retryBtn.disabled = retryCount >= maxRetries;
+        retryBtn.textContent = retryCount >= maxRetries ? "Retry limit reached" : "Retry";
+      }
+    }, 1000);
+  }
+
   // Send SMS code
   sendCodeBtn.onclick = () => {
-    const phoneNumber = phoneNumberInput.value.trim();
-    if (!phoneNumber) {
-      alert("Please enter a valid phone number with country code (+123...)");
+    const number = phoneNumberInput.value.trim();
+    const code = countryCodeSelect.value;
+    if (!number.match(/^\d+$/)) {
+      alert("Please enter a valid phone number digits only (no spaces or symbols).");
       return;
     }
+
+    if (sendCodeBtn.disabled) return; // prevent double click
+
+    const phoneNumber = code + number;
     sendCodeBtn.disabled = true;
+    retryBtn.disabled = true;
+
     signInWithPhoneNumber(auth, phoneNumber, window.recaptchaVerifier)
       .then((result) => {
         confirmationResult = result;
         phoneInputSection.style.display = "none";
         codeInputSection.style.display = "block";
+        retryCount = 0;
+        retryBtn.disabled = true;
+        retryBtn.textContent = "Retry (30s)";
+        startRetryCooldown();
       })
       .catch((error) => {
         alert("Error sending code: " + error.message);
         sendCodeBtn.disabled = false;
+        retryBtn.disabled = false;
       });
+  };
+
+  // Retry button
+  retryBtn.onclick = () => {
+    if (retryCount >= maxRetries) {
+      alert("You have reached the maximum number of retries.");
+      return;
+    }
+    retryCount++;
+    sendCodeBtn.disabled = false;
+    retryBtn.disabled = true;
+    retryBtn.textContent = `Retry (${retryCooldown}s)`;
+    startRetryCooldown();
   };
 
   // Verify SMS code
   verifyCodeBtn.onclick = () => {
     const code = verificationCodeInput.value.trim();
-    if (!code) {
-      alert("Please enter the verification code.");
+    if (!code.match(/^\d{6}$/)) {
+      alert("Please enter a valid 6-digit verification code.");
       return;
     }
     verifyCodeBtn.disabled = true;
     confirmationResult.confirm(code)
       .then((result) => {
-        // Signed in successfully
-        // UI changes handled by onAuthStateChanged below
+        // Signed in successfully, UI handled by onAuthStateChanged
       })
       .catch((error) => {
         alert("Verification failed: " + error.message);
@@ -124,7 +251,7 @@
     signOut(auth);
   };
 
-  // Add a message to chat UI
+  // Add message to chat UI
   function addMessage(data) {
     const { username, text, timestamp } = data;
     const uniqueId = `${username}-${text}-${timestamp || ''}`;
@@ -149,60 +276,61 @@
     chatEl.scrollTop = chatEl.scrollHeight;
   }
 
-  // Listen to auth state
+  // Auth state observer
   onAuthStateChanged(auth, (user) => {
     if (user) {
-      // User logged in
       authSection.style.display = "none";
       chatSection.style.display = "flex";
       usernameDisplay.textContent = `Logged in as: ${user.phoneNumber}`;
 
-      // Set up message listener for this user session
       messagesRef = ref(db, "messages");
       onChildAdded(messagesRef, (snapshot) => {
         addMessage(snapshot.val());
       });
     } else {
-      // User logged out
       authSection.style.display = "block";
       chatSection.style.display = "none";
       phoneInputSection.style.display = "block";
       codeInputSection.style.display = "none";
       sendCodeBtn.disabled = false;
       verifyCodeBtn.disabled = false;
+      retryBtn.disabled = true;
+      retryBtn.textContent = "Retry (30s)";
       chatEl.innerHTML = "";
       displayedMessages.clear();
       phoneNumberInput.value = "";
       verificationCodeInput.value = "";
-      // Reset reCAPTCHA (sometimes necessary)
-      window.recaptchaVerifier.clear();
-      window.recaptchaVerifier.render().then(widgetId => {
-        grecaptcha.reset(widgetId);
-      });
+      retryCount = 0;
+      clearInterval(retryTimer);
+
+      // Reset reCAPTCHA
+      if (window.recaptchaVerifier) {
+        window.recaptchaVerifier.clear();
+        window.recaptchaVerifier.render().then(widgetId => {
+          grecaptcha.reset(widgetId);
+        });
+      }
     }
   });
 
-  // Send message function (only works when logged in)
+  // Send chat message
   sendBtn.onclick = () => {
     const text = inputEl.value.trim();
-    if (text === "") return;
+    const user = auth.currentUser;
+    if (!text) return;
+    if (!user) {
+      alert("You must be logged in to send messages.");
+      return;
+    }
 
-    // Optimistic UI
-    addMessage({ username: auth.currentUser.phoneNumber, text, timestamp: Date.now() });
-
-    push(messagesRef, {
-      username: auth.currentUser.phoneNumber,
+    push(ref(db, "messages"), {
+      username: user.phoneNumber,
       text,
       timestamp: serverTimestamp()
     });
 
     inputEl.value = "";
-    inputEl.focus();
   };
-
-  inputEl.addEventListener("keypress", (e) => {
-    if (e.key === "Enter") sendBtn.onclick();
-  });
 
 </script>
 
