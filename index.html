@@ -3,72 +3,41 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Simple Firebase Chat</title>
-<style>
-  body {
-    font-family: Arial, sans-serif;
-    max-width: 600px;
-    margin: 20px auto;
-    display: flex;
-    flex-direction: column;
-    height: 90vh;
-  }
-  #chat {
-    flex: 1;
-    border: 1px solid #ccc;
-    padding: 10px;
-    overflow-y: auto;
-    margin-bottom: 10px;
-    background: #f9f9f9;
-  }
-  #chat div {
-    margin-bottom: 8px;
-  }
-  #chat .username {
-    font-weight: bold;
-    margin-right: 5px;
-    color: #2b7a78;
-  }
-  #chat .message {
-    display: inline-block;
-    word-wrap: break-word;
-    max-width: 80%;
-  }
-  #inputArea {
-    display: flex;
-  }
-  #messageInput {
-    flex: 1;
-    padding: 8px;
-    font-size: 16px;
-  }
-  #sendBtn {
-    padding: 8px 16px;
-    font-size: 16px;
-    margin-left: 5px;
-  }
-  #usernameDisplay {
-    margin-bottom: 10px;
-    font-style: italic;
-    color: #555;
-  }
-</style>
+<title>Phone Verified Firebase Chat</title>
+<link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-<h2>Simple Firebase Chat</h2>
-<div id="usernameDisplay"></div>
-<div id="chat"></div>
-<div id="inputArea">
-  <input id="messageInput" type="text" placeholder="Type your message..." autocomplete="off" />
-  <button id="sendBtn">Send</button>
+<h2>Phone Verified Chat</h2>
+
+<div id="authSection">
+  <div id="phoneInputSection">
+    <input type="tel" id="phoneNumber" placeholder="+1234567890" />
+    <div id="recaptcha-container"></div>
+    <button id="sendCodeBtn">Send Code</button>
+  </div>
+
+  <div id="codeInputSection" style="display:none;">
+    <input type="text" id="verificationCode" placeholder="Enter verification code" />
+    <button id="verifyCodeBtn">Verify Code</button>
+  </div>
+</div>
+
+<div id="chatSection" style="display:none;">
+  <div id="usernameDisplay"></div>
+  <div id="chat"></div>
+  <div id="inputArea">
+    <input id="messageInput" type="text" placeholder="Type your message..." autocomplete="off" />
+    <button id="sendBtn">Send</button>
+  </div>
+  <button id="logoutBtn" style="margin-top:10px;">Logout</button>
 </div>
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
   import { getDatabase, ref, push, onChildAdded, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-database.js";
+  import { getAuth, RecaptchaVerifier, signInWithPhoneNumber, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 
-  // Your Firebase config:
   const firebaseConfig = {
     apiKey: "AIzaSyCdOdsdiClQ-Ef4uADX2gglOl04CulpYrE",
     authDomain: "ismand-cloudns-be.firebaseapp.com",
@@ -79,28 +48,95 @@
     appId: "1:225354161393:web:d51871c9e27b2d6ace1d50"
   };
 
-  // Initialize Firebase
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
-  const messagesRef = ref(db, "messages");
+  const auth = getAuth(app);
 
-  // Generate a random username (e.g. User1234)
-  const username = "User" + Math.floor(Math.random() * 9000 + 1000);
-  document.getElementById("usernameDisplay").textContent = `You are: ${username}`;
-
-  // DOM elements
+  // UI elements
+  const authSection = document.getElementById("authSection");
+  const phoneInputSection = document.getElementById("phoneInputSection");
+  const codeInputSection = document.getElementById("codeInputSection");
+  const phoneNumberInput = document.getElementById("phoneNumber");
+  const sendCodeBtn = document.getElementById("sendCodeBtn");
+  const verificationCodeInput = document.getElementById("verificationCode");
+  const verifyCodeBtn = document.getElementById("verifyCodeBtn");
+  const chatSection = document.getElementById("chatSection");
+  const usernameDisplay = document.getElementById("usernameDisplay");
   const chatEl = document.getElementById("chat");
   const inputEl = document.getElementById("messageInput");
   const sendBtn = document.getElementById("sendBtn");
+  const logoutBtn = document.getElementById("logoutBtn");
 
-  // Function to add message to chat window
+  let confirmationResult = null;
+  let messagesRef = null;
+  const displayedMessages = new Set();
+
+  // Setup invisible reCAPTCHA
+  window.recaptchaVerifier = new RecaptchaVerifier('recaptcha-container', {
+    'size': 'invisible',
+    'callback': (response) => {
+      // reCAPTCHA solved, allow sendCodeBtn click to proceed
+      sendCodeBtn.disabled = false;
+    }
+  }, auth);
+
+  // Send SMS code
+  sendCodeBtn.onclick = () => {
+    const phoneNumber = phoneNumberInput.value.trim();
+    if (!phoneNumber) {
+      alert("Please enter a valid phone number with country code (+123...)");
+      return;
+    }
+    sendCodeBtn.disabled = true;
+    signInWithPhoneNumber(auth, phoneNumber, window.recaptchaVerifier)
+      .then((result) => {
+        confirmationResult = result;
+        phoneInputSection.style.display = "none";
+        codeInputSection.style.display = "block";
+      })
+      .catch((error) => {
+        alert("Error sending code: " + error.message);
+        sendCodeBtn.disabled = false;
+      });
+  };
+
+  // Verify SMS code
+  verifyCodeBtn.onclick = () => {
+    const code = verificationCodeInput.value.trim();
+    if (!code) {
+      alert("Please enter the verification code.");
+      return;
+    }
+    verifyCodeBtn.disabled = true;
+    confirmationResult.confirm(code)
+      .then((result) => {
+        // Signed in successfully
+        // UI changes handled by onAuthStateChanged below
+      })
+      .catch((error) => {
+        alert("Verification failed: " + error.message);
+        verifyCodeBtn.disabled = false;
+      });
+  };
+
+  // Logout button
+  logoutBtn.onclick = () => {
+    signOut(auth);
+  };
+
+  // Add a message to chat UI
   function addMessage(data) {
-    const { username: user, text } = data;
+    const { username, text, timestamp } = data;
+    const uniqueId = `${username}-${text}-${timestamp || ''}`;
+
+    if (displayedMessages.has(uniqueId)) return;
+    displayedMessages.add(uniqueId);
+
     const msgDiv = document.createElement("div");
 
     const userSpan = document.createElement("span");
     userSpan.classList.add("username");
-    userSpan.textContent = user + ":";
+    userSpan.textContent = username + ":";
 
     const textSpan = document.createElement("span");
     textSpan.classList.add("message");
@@ -110,33 +146,64 @@
     msgDiv.appendChild(textSpan);
     chatEl.appendChild(msgDiv);
 
-    // Scroll to bottom
     chatEl.scrollTop = chatEl.scrollHeight;
   }
 
-  // Listen for new messages
-  onChildAdded(messagesRef, (snapshot) => {
-    const msgData = snapshot.val();
-    addMessage(msgData);
+  // Listen to auth state
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      // User logged in
+      authSection.style.display = "none";
+      chatSection.style.display = "flex";
+      usernameDisplay.textContent = `Logged in as: ${user.phoneNumber}`;
+
+      // Set up message listener for this user session
+      messagesRef = ref(db, "messages");
+      onChildAdded(messagesRef, (snapshot) => {
+        addMessage(snapshot.val());
+      });
+    } else {
+      // User logged out
+      authSection.style.display = "block";
+      chatSection.style.display = "none";
+      phoneInputSection.style.display = "block";
+      codeInputSection.style.display = "none";
+      sendCodeBtn.disabled = false;
+      verifyCodeBtn.disabled = false;
+      chatEl.innerHTML = "";
+      displayedMessages.clear();
+      phoneNumberInput.value = "";
+      verificationCodeInput.value = "";
+      // Reset reCAPTCHA (sometimes necessary)
+      window.recaptchaVerifier.clear();
+      window.recaptchaVerifier.render().then(widgetId => {
+        grecaptcha.reset(widgetId);
+      });
+    }
   });
 
-  // Send a message
-  function sendMessage() {
+  // Send message function (only works when logged in)
+  sendBtn.onclick = () => {
     const text = inputEl.value.trim();
     if (text === "") return;
+
+    // Optimistic UI
+    addMessage({ username: auth.currentUser.phoneNumber, text, timestamp: Date.now() });
+
     push(messagesRef, {
-      username,
+      username: auth.currentUser.phoneNumber,
       text,
       timestamp: serverTimestamp()
     });
+
     inputEl.value = "";
     inputEl.focus();
-  }
+  };
 
-  sendBtn.addEventListener("click", sendMessage);
   inputEl.addEventListener("keypress", (e) => {
-    if (e.key === "Enter") sendMessage();
+    if (e.key === "Enter") sendBtn.onclick();
   });
+
 </script>
 
 </body>
