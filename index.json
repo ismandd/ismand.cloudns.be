@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>404. That’s an error.</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    color: #202124;
+    margin: 0;
+    padding: 0;
+    text-align: center;
+    background-color: #fff;
+  }
+  .logo {
+    margin-top: 60px;
+  }
+  .logo svg {
+    width: 272px;
+    height: 92px;
+  }
+  h1 {
+    font-weight: normal;
+    font-size: 24px;
+    margin: 40px 0 0 0;
+  }
+  p {
+    color: #5f6368;
+    font-size: 14px;
+    margin: 8px 0 40px 0;
+  }
+  a {
+    color: #1a73e8;
+    text-decoration: none;
+    font-weight: 500;
+  }
+  a:hover {
+    text-decoration: underline;
+  }
+</style>
+</head>
+<body>
+  <div class="logo" aria-label="Google">
+    <!-- Google logo SVG -->
+    <svg focusable="false" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 272 92" >
+      <path fill="#4285F4" d="M115.61 52.276h-11.9v17.7h-17.6v-56h30.3c8 0 14.2 2.3 18.4 7 4 4.5 6 10.8 6 18.2 0 8.4-2.7 15-7.6 19.3-4.4 4-11 6-18.2 6zm-1.5-34.8h-11v14.3h11c4.7 0 8-1.8 9.7-5.1 1.4-2.7 1.4-7 0-9.4-1.5-3.6-5-4.8-9.7-4.8z"/>
+      <path fill="#34A853" d="M152.9 69.976h-17.7V26.7h17.7v43.3z"/>
+      <path fill="#FBBC05" d="M178.43 69.976h-12.3l-3.2-10.6h-14v10.6h-17.7v-56h17.7v20.3h14l4.2-13.6h12.2l-8.2 25.2 9.6 30.1z"/>
+      <path fill="#EA4335" d="M194.6 69.976h-17.7v-56h17.7v56z"/>
+      <path fill="#4285F4" d="M211.2 42.776c0-3.4-2.8-6.2-6.2-6.2-3.4 0-6.2 2.8-6.2 6.2 0 3.4 2.8 6.2 6.2 6.2 3.4 0 6.2-2.8 6.2-6.2z"/>
+      <path fill="#34A853" d="M235.9 26.7v43.3h-11.2v-12.6h-8v12.6h-11.2v-43.3h11.2v14.4h8v-14.4h11.2z"/>
+      <path fill="#FBBC05" d="M264.6 69.976h-17.7v-56h17.7v56z"/>
+      <path fill="#EA4335" d="M272 26.7v43.3h-17.7v-43.3H272z"/>
+    </svg>
+  </div>
+  <h1>404. That’s an error.</h1>
+  <p>The requested URL was not found on this server. That’s all we know.</p>
+  <a href="/">Go to Google Home</a>
+</body>
+</html>
